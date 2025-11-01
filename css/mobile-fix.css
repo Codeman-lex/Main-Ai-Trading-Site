@@ -1,0 +1,37 @@
+/* Mobile fix to center the "Start Free Consultation" button */
+@media (max-width: 768px) {
+  /* Target the first button in a container to center it */
+  /* This applies to buttons that come before the "Learn How It Works" button */
+  section > div > button:first-of-type,
+  section > div > a:first-of-type,
+  section > div > div > button:first-of-type,
+  section > div > div > a:first-of-type,
+  [class*="hero"] > div > button:first-of-type,
+  [class*="hero"] > div > a:first-of-type {
+    margin-left: auto !important;
+    margin-right: auto !important;
+  }
+  
+  /* Center parent container if it has buttons */
+  div:has(> button:first-child):not(:has(> button:nth-child(2))) {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+  }
+  
+  /* More specific: target the direct parent of the first button */
+  button:first-of-type,
+  a:first-of-type {
+    align-self: center;
+  }
+  
+  /* Ensure the button wrapper is centered on mobile */
+  body > * > section > div:first-child,
+  body > * > section > div > div:first-child {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: center !important;
+  }
+}
+
