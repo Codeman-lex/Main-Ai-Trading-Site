@@ -93,7 +93,22 @@ Error generating stack: `+l.message+`
 				var targetMail = 'mailto:support@realaitrading.com';
 
 				function isContactHref(href){
-					return href && (href === '/contact' || href === '/contact/' || href.indexOf('/contact') === 0);
+					if(!href) return false;
+					if (href === '/contact' || href === '/contact/' || href.indexOf('/contact') === 0) return true;
+					if (href.indexOf('mailto:') === 0) return true;
+					return false;
+				}
+
+				function getHref(el){
+					if (!el) return '';
+					var tag = el.tagName;
+					if (tag === 'A') return el.getAttribute('href') || '';
+					// Some UIs use <button href="..."> or data-href
+					var h1 = el.getAttribute('href');
+					if (h1) return h1;
+					var h2 = el.getAttribute('data-href');
+					if (h2) return h2;
+					return '';
 				}
 
 				function openMail(){
@@ -105,12 +120,14 @@ Error generating stack: `+l.message+`
 					try{
 						var el = e.target;
 						while(el && el !== document){
-							if(el.tagName === 'A'){
-								var href = el.getAttribute('href');
+							if(el.tagName === 'A' || el.tagName === 'BUTTON'){
+								var href = getHref(el);
 								if(isContactHref(href)){
 									e.preventDefault();
 									e.stopImmediatePropagation && e.stopImmediatePropagation();
-									openMail();
+									// If the element already points to mailto, respect that; otherwise use targetMail
+									try{ window.location.href = href.indexOf('mailto:')===0 ? href : targetMail; }catch(err){}
+									try{ window.open(href.indexOf('mailto:')===0 ? href : targetMail, '_self'); }catch(err){}
 									return;
 								}
 							}
@@ -123,13 +140,36 @@ Error generating stack: `+l.message+`
 					try{
 						var el = e.target;
 						while(el && el !== document){
-							if(el.tagName === 'A'){
-								var href = el.getAttribute('href');
+							if(el.tagName === 'A' || el.tagName === 'BUTTON'){
+								var href = getHref(el);
 								if(isContactHref(href)){
 									e.preventDefault();
 									e.stopImmediatePropagation && e.stopImmediatePropagation();
 									// call openMail asynchronously to avoid interfering with other handlers
-									setTimeout(openMail, 0);
+									setTimeout(function(){
+										try{ window.location.href = href.indexOf('mailto:')===0 ? href : targetMail; }catch(err){}
+										try{ window.open(href.indexOf('mailto:')===0 ? href : targetMail, '_self'); }catch(err){}
+									}, 0);
+									return;
+								}
+							}
+							el = el.parentElement;
+						}
+					}catch(err){/* ignore */}
+				}
+
+				function handleKey(e){
+					try{
+						if(e.key !== 'Enter' && e.key !== ' ' && e.key !== 'Spacebar') return;
+						var el = e.target;
+						while(el && el !== document){
+							if(el.tagName === 'A' || el.tagName === 'BUTTON'){
+								var href = getHref(el);
+								if(isContactHref(href)){
+									e.preventDefault();
+									e.stopImmediatePropagation && e.stopImmediatePropagation();
+									try{ window.location.href = href.indexOf('mailto:')===0 ? href : targetMail; }catch(err){}
+									try{ window.open(href.indexOf('mailto:')===0 ? href : targetMail, '_self'); }catch(err){}
 									return;
 								}
 							}
@@ -141,14 +181,31 @@ Error generating stack: `+l.message+`
 				// Intercept pointerdown/mousedown and clicks in capture phase to beat client-side router handlers
 				document.addEventListener('pointerdown', handlePointer, true);
 				document.addEventListener('mousedown', handlePointer, true);
+				document.addEventListener('touchstart', handlePointer, true);
 				document.addEventListener('click', handleClick, true);
+				document.addEventListener('keydown', handleKey, true);
 
 				// Patch existing anchors that match /contact to have a mailto href (helpful for non-router anchors)
 				function patchExisting(){
 					try{
-						document.querySelectorAll('a[href^="/contact"]').forEach(function(a){
+						document.querySelectorAll('a[href^="/contact"], button[href^="/contact"]').forEach(function(a){
 							a.setAttribute('href', targetMail);
 							a.setAttribute('target','_self');
+						});
+						// Ensure any buttons with a direct mailto behave like links
+						document.querySelectorAll('button[href^="mailto:"]').forEach(function(btn){
+							if (btn.dataset.mailtoBound === '1') return;
+							btn.dataset.mailtoBound = '1';
+							btn.setAttribute('role','link');
+							if(!btn.hasAttribute('tabindex')) btn.setAttribute('tabindex','0');
+							btn.style.cursor = 'pointer';
+							var href = btn.getAttribute('href');
+							var go = function(){
+								try{ window.location.href = href; }catch(e){}
+								try{ window.open(href, '_self'); }catch(e){}
+							};
+							btn.addEventListener('click', function(ev){ ev.preventDefault(); ev.stopImmediatePropagation && ev.stopImmediatePropagation(); go(); }, true);
+							btn.addEventListener('keydown', function(ev){ if(ev.key==='Enter'||ev.key===' '||ev.key==='Spacebar'){ ev.preventDefault(); ev.stopImmediatePropagation && ev.stopImmediatePropagation(); go(); } }, true);
 						});
 					}catch(e){}
 				}
@@ -169,6 +226,20 @@ Error generating stack: `+l.message+`
 									node.querySelectorAll && node.querySelectorAll('a[href^="/contact"]').forEach(function(a){
 										a.setAttribute('href', targetMail);
 										a.setAttribute('target','_self');
+									});
+									// Bind behavior for dynamically added buttons with mailto
+									if(node.matches && node.matches('button[href^="mailto:"]')){
+										var btn=node; if (btn.dataset.mailtoBound !== '1'){ btn.dataset.mailtoBound = '1'; btn.setAttribute('role','link'); if(!btn.hasAttribute('tabindex')) btn.setAttribute('tabindex','0'); btn.style.cursor='pointer'; var href=btn.getAttribute('href'); var go=function(){ try{ window.location.href = href; }catch(e){} try{ window.open(href, '_self'); }catch(e){} }; btn.addEventListener('click', function(ev){ ev.preventDefault(); ev.stopImmediatePropagation && ev.stopImmediatePropagation(); go(); }, true); btn.addEventListener('keydown', function(ev){ if(ev.key==='Enter'||ev.key===' '||ev.key==='Spacebar'){ ev.preventDefault(); ev.stopImmediatePropagation && ev.stopImmediatePropagation(); go(); } }, true);} }
+									node.querySelectorAll && node.querySelectorAll('button[href^="mailto:"]').forEach(function(btn){
+										if (btn.dataset.mailtoBound === '1') return;
+										btn.dataset.mailtoBound = '1';
+										btn.setAttribute('role','link');
+										if(!btn.hasAttribute('tabindex')) btn.setAttribute('tabindex','0');
+										btn.style.cursor = 'pointer';
+										var href = btn.getAttribute('href');
+										var go = function(){ try{ window.location.href = href; }catch(e){} try{ window.open(href, '_self'); }catch(e){} };
+										btn.addEventListener('click', function(ev){ ev.preventDefault(); ev.stopImmediatePropagation && ev.stopImmediatePropagation(); go(); }, true);
+										btn.addEventListener('keydown', function(ev){ if(ev.key==='Enter'||ev.key===' '||ev.key==='Spacebar'){ ev.preventDefault(); ev.stopImmediatePropagation && ev.stopImmediatePropagation(); go(); } }, true);
 									});
 								}
 							}catch(e){}
@@ -2571,5 +2642,31 @@ Not an official Manus doc nor endorsed by Manus. Content may contain inaccuracie
   			}
 			})
 		</script>
+  
+    <script>
+      (function () {
+        function addEmail() {
+          var el = document.querySelector('a[href^="mailto:support@realaitrading.com"], button[href^="mailto:support@realaitrading.com"]');
+          if (!el) return;
+          if (el.dataset.emailAdded === '1') return;
+          el.dataset.emailAdded = '1';
+          var span = document.createElement('span');
+          span.textContent = ' support@realaitrading.com';
+          span.style.fontWeight = '600';
+          span.style.fontSize = '0.9em';
+          var svg = el.querySelector('svg');
+          if (svg) {
+            el.insertBefore(span, svg);
+          } else {
+            el.appendChild(span);
+          }
+        }
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', addEmail);
+        } else {
+          addEmail();
+        }
+      })();
+    </script>
 
 </body></html>
